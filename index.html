@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Chore Wheel</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F2A22">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg: #EEF2ED;
+    --ink: #1F2A22;
+    --ink-soft: #4B5A4E;
+    --card: #FFFFFF;
+    --fern: #3E6B3A;
+    --fern-soft: #DCE9D9;
+    --slate: #3E6B7A;
+    --slate-soft: #DCE7E9;
+    --marigold: #D9A441;
+    --marigold-soft: #F4E7CC;
+    --clay: #A8583F;
+    --clay-soft: #EEDCD5;
+    --line: #D8E0D6;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Karla', 'Segoe UI', system-ui, sans-serif;
+    padding: 32px 20px 60px;
+    min-height: 100vh;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Karla:wght@400;500;700&display=swap');
+  h1,h2,h3, .num { font-family: 'Space Grotesk', sans-serif; }
+
+  .wrap { max-width: 920px; margin: 0 auto; }
+
+  .top {
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap:wrap; gap:12px; margin-bottom: 28px;
+  }
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: .14em; font-size: 11px;
+    color: var(--ink-soft); font-weight: 700; margin: 0 0 4px;
+  }
+  h1 { font-size: 30px; margin: 0; font-weight: 700; }
+  .weekband {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 18px; font-size: 14px;
+    color: var(--ink-soft); font-weight: 500;
+    display:flex; align-items:center; gap:10px;
+  }
+  .weekband b { color: var(--ink); font-family:'Space Grotesk',sans-serif; }
+
+  .syncbar {
+    display:flex; align-items:center; gap:8px; font-size: 12.5px; color: var(--ink-soft);
+    margin: -16px 0 18px 2px; font-family:'Space Grotesk',sans-serif;
+  }
+  .dot { width:8px; height:8px; border-radius:50%; background:#B8B8B8; flex-shrink:0; transition: background .3s ease; }
+  .dot.live { background: var(--fern); }
+  .dot.offline { background: var(--clay); }
+  .dot.syncing { background: var(--marigold); }
+  .btn-sync { padding: 4px 12px; font-size: 11.5px; margin-left: 4px; }
+
+  .dial-section {
+    display:flex; gap: 36px; align-items:center; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 28px; margin-bottom: 22px;
+  }
+  #wheel-holder { position:relative; flex: 0 0 280px; width:280px; height:280px; }
+  #wheel { width:100%; height:100%; transition: transform 900ms cubic-bezier(.2,.8,.2,1); }
+  .hub {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:78px; height:78px; border-radius:50%; background: var(--ink);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; text-align:center; font-family:'Space Grotesk',sans-serif;
+    font-size:11px; line-height:1.2; letter-spacing:.03em; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  }
+  .hub .n { font-size: 20px; font-weight:700; }
+  .pointer {
+    position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+    width:0; height:0; border-left: 10px solid transparent; border-right: 10px solid transparent;
+    border-bottom: 18px solid var(--ink); filter: drop-shadow(0 2px 2px rgba(0,0,0,.2));
+  }
+
+  .assignments { flex: 1 1 340px; min-width: 280px; }
+  .assignments h2 { margin: 0 0 14px; font-size: 15px; text-transform:uppercase; letter-spacing:.08em; color: var(--ink-soft); }
+  .assign-row {
+    display:flex; align-items:center; gap:12px; padding: 10px 12px;
+    border-radius: 12px; margin-bottom: 8px;
+  }
+  .swatch { width: 14px; height:14px; border-radius:4px; flex-shrink:0; }
+  .assign-row .who { font-weight: 700; min-width: 110px; }
+  .assign-row .what { color: var(--ink-soft); font-size: 14px; }
+
+  .controls { display:flex; gap:10px; margin-top: 18px; flex-wrap:wrap; }
+  button {
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size: 13.5px;
+    border-radius: 999px; border: none; padding: 11px 20px; cursor:pointer;
+    display:flex; align-items:center; gap:8px; transition: transform .15s ease, box-shadow .15s ease;
+  }
+  button:active { transform: scale(.96); }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-primary:hover { box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+  .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+  .upcoming {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 28px; margin-bottom: 22px;
+  }
+  .upcoming h2 { font-size: 15px; text-transform:uppercase; letter-spacing:.08em; color: var(--ink-soft); margin:0 0 14px;}
+  table { width:100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align:left; color: var(--ink-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; padding-bottom:8px; border-bottom: 1px solid var(--line);}
+  td { padding: 10px 6px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding: 3px 10px; border-radius: 999px; font-size:12px; font-weight:700; }
+
+  details {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 24px;
+  }
+  summary { cursor:pointer; font-weight:700; font-family:'Space Grotesk',sans-serif; font-size:14px; }
+  .edit-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top:18px; }
+  @media (max-width: 620px){ .edit-grid { grid-template-columns: 1fr; } }
+  .field-group label { display:block; font-size:12px; color: var(--ink-soft); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin: 12px 0 4px; }
+  .field-group input {
+    width:100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
+    font-family:'Karla',sans-serif; font-size: 14px; background: var(--bg);
+  }
+  .field-group input:focus { outline: 2px solid var(--fern); outline-offset: 1px; }
+  .save-row { margin-top: 18px; }
+  .status { font-size: 12px; color: var(--ink-soft); margin-top: 8px; min-height: 16px; }
+  .note { font-size: 12.5px; color: var(--ink-soft); margin: -6px 0 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <p class="eyebrow">Household · Shared with everyone in the house</p>
+      <h1>The Chore Wheel</h1>
+    </div>
+    <div class="weekband">Week of <b id="week-label">—</b></div>
+  </div>
+
+  <div class="syncbar" id="syncbar">
+    <span class="dot" id="sync-dot"></span>
+    <span id="sync-text">Connecting…</span>
+    <button class="btn-ghost btn-sync" id="sync-now-btn">Sync now</button>
+    <button class="btn-ghost btn-sync" id="setup-toggle-btn">Sync setup</button>
+  </div>
+
+  <div class="upcoming" id="setup-panel" style="display:none;">
+    <h2>One-time sync setup</h2>
+    <p class="note" style="margin-top:0;">
+      This lets everyone's copy of this file talk to each other over the internet, using a free
+      account at <a href="https://jsonbin.io" target="_blank" rel="noopener">jsonbin.io</a>. Do this
+      once, then share the same two values with your roommates so their copy connects to the same place.
+    </p>
+    <ol style="font-size:14px; color:var(--ink-soft); padding-left: 20px; line-height:1.7;">
+      <li>Create a free account at <a href="https://jsonbin.io" target="_blank" rel="noopener">jsonbin.io</a>.</li>
+      <li>Go to <b>API Keys</b> in your dashboard and create an <b>Access Key</b> with Bins <b>Create</b>, <b>Read</b> and <b>Update</b> permission checked (leave Delete off).</li>
+      <li>Go to the dashboard and click <b>Create Bin</b>. Paste in <code>{"names":["Alex","Sam","Jordan","Riley"],"chores":["Kitchen &amp; Dishes","Bathroom","Living Room &amp; Trash","Floors &amp; Common Areas"],"weekOffset":0,"anchorWeekStart":"2025-01-06T00:00:00.000Z","lastModified":1}</code> and save it.</li>
+      <li>Copy the <b>Bin ID</b> (shown on the bin's page/URL) and your <b>Access Key</b> into the two fields below.</li>
+    </ol>
+    <div class="edit-grid">
+      <div class="field-group">
+        <label>Bin ID</label>
+        <input id="cfg-bin-id" placeholder="e.g. 65f2a1b3...">
+      </div>
+      <div class="field-group">
+        <label>Access Key</label>
+        <input id="cfg-api-key" placeholder="e.g. $2b$10$...">
+      </div>
+    </div>
+    <div class="save-row">
+      <button class="btn-primary" id="save-config-btn">Save &amp; connect</button>
+      <div class="status" id="config-status"></div>
+    </div>
+    <p class="note" style="margin-top:14px;">
+      Every roommate needs to enter the <b>same Bin ID and Access Key</b> in their own copy of this file
+      (send it to them once, e.g. in your house group chat). The key lives only in this browser's storage —
+      it isn't uploaded anywhere except to jsonbin.io itself.
+    </p>
+  </div>
+
+  <div class="dial-section">
+    <div id="wheel-holder">
+      <div class="pointer"></div>
+      <svg id="wheel" viewBox="0 0 280 280"></svg>
+      <div class="hub"><span class="n" id="hub-week">–</span><span>WEEK</span></div>
+    </div>
+    <div class="assignments">
+      <h2>This week's assignments</h2>
+      <div id="assign-list"></div>
+      <div class="controls">
+        <button class="btn-primary" id="next-week-btn">→ Roll to next week</button>
+        <button class="btn-ghost" id="prev-week-btn">← Back a week</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="upcoming">
+    <h2>Next four weeks</h2>
+    <table>
+      <thead><tr><th>Week of</th><th id="c1"></th><th id="c2"></th><th id="c3"></th><th id="c4"></th></tr></thead>
+      <tbody id="upcoming-body"></tbody>
+    </table>
+  </div>
+
+  <details id="edit-panel">
+    <summary>Edit roommates &amp; chores</summary>
+    <p class="note">Changes save for the whole house — everyone sees the same wheel.</p>
+    <div class="edit-grid">
+      <div class="field-group">
+        <label>Roommates</label>
+        <input id="name-0" placeholder="Roommate 1">
+        <input id="name-1" placeholder="Roommate 2">
+        <input id="name-2" placeholder="Roommate 3">
+        <input id="name-3" placeholder="Roommate 4">
+      </div>
+      <div class="field-group">
+        <label>Chores</label>
+        <input id="chore-0" placeholder="Chore 1">
+        <input id="chore-1" placeholder="Chore 2">
+        <input id="chore-2" placeholder="Chore 3">
+        <input id="chore-3" placeholder="Chore 4">
+      </div>
+    </div>
+    <div class="save-row">
+      <button class="btn-primary" id="save-btn">Save changes</button>
+      <div class="status" id="save-status"></div>
+    </div>
+  </details>
+
+</div>
+
+<script>
+const COLORS = [
+  { fill: '#3E6B3A', soft: '#DCE9D9' }, // fern
+  { fill: '#3E6B7A', soft: '#DCE7E9' }, // slate
+  { fill: '#D9A441', soft: '#F4E7CC' }, // marigold
+  { fill: '#A8583F', soft: '#EEDCD5' }, // clay
+];
+
+const DEFAULT_STATE = {
+  names: ['Alex', 'Sam', 'Jordan', 'Riley'],
+  chores: ['Kitchen & Dishes', 'Bathroom', 'Living Room & Trash', 'Floors & Common Areas'],
+  weekOffset: 0,
+  anchorWeekStart: startOfThisWeek().toISOString(),
+  lastModified: 0
+};
+
+// state is kept in memory as the "local" copy. It's written to shared
+// storage on every change (so it reaches the rest of the house), and
+// refreshed from shared storage on a timer (so changes from the rest of
+// the house reach it). lastModified resolves conflicts: whichever copy
+// changed most recently wins the merge.
+let state = null;
+const STORAGE_KEY = 'chore-wheel:config';       // shared config cached locally
+const CONFIG_KEY = 'chore-wheel:sync-config';   // { binId, apiKey } for jsonbin
+const POLL_MS = 8000;
+let pollTimer = null;
+let pendingWrite = false;
+let syncConfig = null;
+
+function getSyncConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function saveSyncConfig(cfg) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function isConfigured() {
+  return !!(syncConfig && syncConfig.binId && syncConfig.apiKey);
+}
+
+function binUrl() {
+  return `https://api.jsonbin.io/v3/b/${syncConfig.binId}`;
+}
+
+function startOfThisWeek(d = new Date()) {
+  const day = d.getDay(); // 0 = Sunday
+  const diff = (day === 0 ? -6 : 1) - day; // move to Monday
+  const monday = new Date(d);
+  monday.setHours(0,0,0,0);
+  monday.setDate(d.getDate() + diff);
+  return monday;
+}
+
+function weeksBetween(a, b) {
+  const MS = 1000*60*60*24*7;
+  return Math.round((b - a) / MS);
+}
+
+function fmtDate(d) {
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function setSyncStatus(mode, text) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-text');
+  if (!dot || !label) return;
+  dot.className = 'dot' + (mode ? ' ' + mode : '');
+  label.textContent = text;
+}
+
+function timeAgo(ts) {
+  if (!ts) return 'never';
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return s + 's ago';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + 'm ago';
+  return Math.round(m / 60) + 'h ago';
+}
+
+async function loadState() {
+  syncConfig = getSyncConfig();
+
+  // Paint instantly from whatever is cached locally on this device.
+  try {
+    const cached = localStorage.getItem(STORAGE_KEY);
+    state = cached ? { ...DEFAULT_STATE, ...JSON.parse(cached) } : { ...DEFAULT_STATE, lastModified: Date.now() };
+  } catch (e) {
+    state = { ...DEFAULT_STATE, lastModified: Date.now() };
+  }
+  render();
+
+  if (!isConfigured()) {
+    setSyncStatus('offline', 'Not connected — set up sync to share with your house');
+    document.getElementById('setup-panel').style.display = 'block';
+    return;
+  }
+
+  await pullAndMerge(true);
+  startPolling();
+}
+
+function cacheLocally() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+// Push the local copy to jsonbin.io so other housemates' copies pick it up.
+async function writeThrough() {
+  cacheLocally();
+  if (!isConfigured()) { setSyncStatus('offline', 'Not connected — set up sync to share with your house'); return; }
+  pendingWrite = true;
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    const res = await fetch(binUrl(), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Key': syncConfig.apiKey },
+      body: JSON.stringify(state)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setSyncStatus('live', 'Synced just now');
+  } catch (e) {
+    console.error('Sync failed, will retry', e);
+    setSyncStatus('offline', 'Offline — will retry sync');
+    setTimeout(writeThrough, 5000);
+  } finally {
+    pendingWrite = false;
+  }
+}
+
+// Pull the shared copy and merge in anything newer than the local copy.
+// Last-write-wins on the whole config, keyed by lastModified.
+async function pullAndMerge(showBusy) {
+  if (!isConfigured()) return;
+  if (pendingWrite) return;
+  if (showBusy) setSyncStatus('syncing', 'Checking for updates…');
+  try {
+    const res = await fetch(binUrl() + '/latest', {
+      headers: { 'X-Access-Key': syncConfig.apiKey, 'X-Bin-Meta': 'false' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const remote = await res.json();
+    if ((remote.lastModified || 0) > (state.lastModified || 0)) {
+      state = { ...DEFAULT_STATE, ...remote };
+      cacheLocally();
+      render();
+    }
+    setSyncStatus('live', 'Synced ' + timeAgo(state.lastModified));
+  } catch (e) {
+    console.error('Pull failed', e);
+    setSyncStatus('offline', 'Offline — showing local copy');
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => pullAndMerge(false), POLL_MS);
+}
+
+async function persist() {
+  state.lastModified = Date.now();
+  await writeThrough();
+}
+
+function currentWeekIndex() {
+  const anchor = new Date(state.anchorWeekStart);
+  const now = startOfThisWeek();
+  return weeksBetween(anchor, now) + state.weekOffset;
+}
+
+function assignmentsForWeek(weekIndex) {
+  const n = state.names.length;
+  return state.names.map((name, i) => {
+    const choreIdx = ((i + weekIndex) % n + n) % n;
+    return { name, chore: state.chores[choreIdx], colorIdx: choreIdx };
+  });
+}
+
+function buildWheel(weekIndex) {
+  const svg = document.getElementById('wheel');
+  const cx = 140, cy = 140, r = 130;
+  const n = state.names.length;
+  const sliceAngle = 360 / n;
+  let paths = '';
+  for (let i = 0; i < n; i++) {
+    const choreIdx = ((i + weekIndex) % n + n) % n;
+    const start = i * sliceAngle - 90;
+    const end = start + sliceAngle;
+    const x1 = cx + r * Math.cos(start * Math.PI/180);
+    const y1 = cy + r * Math.sin(start * Math.PI/180);
+    const x2 = cx + r * Math.cos(end * Math.PI/180);
+    const y2 = cy + r * Math.sin(end * Math.PI/180);
+    const largeArc = sliceAngle > 180 ? 1 : 0;
+    paths += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc} 1 ${x2},${y2} Z" fill="${COLORS[choreIdx % COLORS.length].fill}" stroke="#fff" stroke-width="3"/>`;
+
+    const midAngle = start + sliceAngle/2;
+    const labelR = r * 0.62;
+    const lx = cx + labelR * Math.cos(midAngle * Math.PI/180);
+    const ly = cy + labelR * Math.sin(midAngle * Math.PI/180);
+    paths += `<text x="${lx}" y="${ly}" fill="#fff" font-size="12" font-weight="700" font-family="Space Grotesk, sans-serif" text-anchor="middle" dominant-baseline="middle">${escapeXml(state.names[i])}</text>`;
+  }
+  svg.innerHTML = paths;
+}
+
+function escapeXml(s) {
+  return String(s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
+}
+
+function render() {
+  const weekIndex = currentWeekIndex();
+  const baseMonday = startOfThisWeek();
+  const displayMonday = new Date(baseMonday);
+  displayMonday.setDate(baseMonday.getDate() + 7 * state.weekOffset);
+
+  document.getElementById('week-label').textContent = fmtDate(displayMonday);
+  document.getElementById('hub-week').textContent = weekIndex;
+
+  buildWheel(weekIndex);
+
+  const list = document.getElementById('assign-list');
+  list.innerHTML = '';
+  assignmentsForWeek(weekIndex).forEach(a => {
+    const row = document.createElement('div');
+    row.className = 'assign-row';
+    row.style.background = COLORS[a.colorIdx % COLORS.length].soft;
+    row.innerHTML = `<span class="swatch" style="background:${COLORS[a.colorIdx % COLORS.length].fill}"></span>
+      <span class="who">${escapeXml(a.name)}</span><span class="what">${escapeXml(a.chore)}</span>`;
+    list.appendChild(row);
+  });
+
+  const body = document.getElementById('upcoming-body');
+  body.innerHTML = '';
+  state.names.forEach((_, i) => {
+    document.getElementById('c' + (i+1)).textContent = '';
+  });
+  // header uses roommate names
+  ['c1','c2','c3','c4'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.textContent = state.names[i] || '';
+  });
+
+  for (let k = 1; k <= 4; k++) {
+    const w = weekIndex + k;
+    const wk = new Date(displayMonday);
+    wk.setDate(displayMonday.getDate() + 7 * k);
+    const assigns = assignmentsForWeek(w);
+    const tr = document.createElement('tr');
+    let cells = `<td>${fmtDate(wk)}</td>`;
+    assigns.forEach(a => {
+      cells += `<td><span class="pill" style="background:${COLORS[a.colorIdx % COLORS.length].soft}; color:${COLORS[a.colorIdx % COLORS.length].fill}">${escapeXml(a.chore)}</span></td>`;
+    });
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  }
+
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('name-' + i).value = state.names[i] || '';
+    document.getElementById('chore-' + i).value = state.chores[i] || '';
+  }
+}
+
+document.getElementById('next-week-btn').addEventListener('click', async () => {
+  state.weekOffset += 1;
+  document.getElementById('wheel').style.transform = `rotate(${-(360/state.names.length)}deg)`;
+  await persist();
+  setTimeout(() => { document.getElementById('wheel').style.transform = 'rotate(0deg)'; render(); }, 50);
+});
+
+document.getElementById('prev-week-btn').addEventListener('click', async () => {
+  state.weekOffset -= 1;
+  await persist();
+  render();
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+  const names = [0,1,2,3].map(i => document.getElementById('name-'+i).value.trim()).filter(Boolean);
+  const chores = [0,1,2,3].map(i => document.getElementById('chore-'+i).value.trim()).filter(Boolean);
+  const statusEl = document.getElementById('save-status');
+  if (names.length !== 4 || chores.length !== 4) {
+    statusEl.textContent = 'Please fill in all 4 roommates and all 4 chores.';
+    return;
+  }
+  state.names = names;
+  state.chores = chores;
+  statusEl.textContent = 'Saving…';
+  await persist();
+  statusEl.textContent = 'Saved. Everyone in the house will see this wheel.';
+  render();
+});
+
+document.getElementById('sync-now-btn').addEventListener('click', () => pullAndMerge(true));
+
+document.getElementById('setup-toggle-btn').addEventListener('click', () => {
+  const panel = document.getElementById('setup-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block' && syncConfig) {
+    document.getElementById('cfg-bin-id').value = syncConfig.binId || '';
+    document.getElementById('cfg-api-key').value = syncConfig.apiKey || '';
+  }
+});
+
+document.getElementById('save-config-btn').addEventListener('click', async () => {
+  const binId = document.getElementById('cfg-bin-id').value.trim();
+  const apiKey = document.getElementById('cfg-api-key').value.trim();
+  const statusEl = document.getElementById('config-status');
+  if (!binId || !apiKey) {
+    statusEl.textContent = 'Please enter both the Bin ID and Access Key.';
+    return;
+  }
+  syncConfig = { binId, apiKey };
+  saveSyncConfig(syncConfig);
+  statusEl.textContent = 'Connecting…';
+  await pullAndMerge(true);
+  statusEl.textContent = 'Connected. This device will now sync with your house.';
+  startPolling();
+});
+
+// Keep the "Synced Xs ago" label ticking even when nothing else changes.
+setInterval(() => {
+  if (!pendingWrite && state) {
+    const dot = document.getElementById('sync-dot');
+    if (dot && dot.classList.contains('live')) {
+      setSyncStatus('live', 'Synced ' + timeAgo(state.lastModified));
+    }
+  }
+}, 5000);
+
+// Register the service worker so the app installs to the home screen and
+// still opens when there's no signal.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.log('SW registration skipped:', e));
+  });
+}
+
+loadState();
+</script>
+</body>
+</html>
