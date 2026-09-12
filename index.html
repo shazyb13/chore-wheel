@@ -192,6 +192,12 @@
   .row-edit input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
   .row-edit input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
   .row-edit input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
+  /* Shown only where type="color" isn't supported and degrades to text */
+  .row-edit input.hex-fallback {
+    width: 88px; flex: 0 0 auto; height: auto; border-radius: 10px;
+    padding: 10px 8px; font-size: 13px; text-align: center;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  }
   .row-edit input {
     flex: 1 1 auto; min-width: 0; padding: 10px 12px; border-radius: 10px;
     border: 1px solid var(--line); font-family: 'Karla', sans-serif;
@@ -297,8 +303,8 @@
       <h2>This week</h2>
       <div id="assign-list"></div>
       <div class="controls">
-        <button class="btn-ghost" id="prev-week-btn">Back a week</button>
-        <button class="btn-primary" id="next-week-btn">Roll to next week</button>
+        <button class="btn-ghost" id="prev-week-btn">← Back a week</button>
+        <button class="btn-primary" id="next-week-btn">Roll to next week →</button>
       </div>
     </div>
   </div>
@@ -474,7 +480,20 @@ function normalise(raw) {
 }
 
 /* ---------------- load / save / sync ---------------- */
+// Safari evicts script-writable storage from origins that go unused, which
+// would wipe the saved Bin ID and Access Key. Asking for persistent storage
+// reduces that risk where the browser supports it; harmless where it doesn't.
+async function requestPersistence() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      const already = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+      if (!already) await navigator.storage.persist();
+    }
+  } catch (e) { /* not supported — nothing to do */ }
+}
+
 async function loadState() {
+  requestPersistence();
   syncConfig = getSyncConfig();
 
   try {
@@ -798,15 +817,36 @@ function makeRow(value, index, arr, kind) {
   if (kind === 'chore') {
     const swatch = document.createElement('input');
     swatch.type = 'color';
-    swatch.value = isValidHex(draftColors[index])
+    const startColor = isValidHex(draftColors[index])
       ? draftColors[index]
       : COLORS[index % COLORS.length].fill;
+
+    // If the browser doesn't support type="color" it silently becomes a text
+    // field. Detect that and let it be a usable hex box instead of a 32px dot.
+    if (swatch.type !== 'color') {
+      swatch.classList.add('hex-fallback');
+      swatch.placeholder = '#3E6B3A';
+      swatch.setAttribute('inputmode', 'text');
+      swatch.autocapitalize = 'off';
+      swatch.autocorrect = 'off';
+      swatch.spellcheck = false;
+    }
+    swatch.value = startColor;
     swatch.title = 'Pick a colour for this chore';
     swatch.setAttribute('aria-label', 'Colour for this chore');
-    swatch.addEventListener('input', () => {
-      draftColors[index] = swatch.value;
-      document.getElementById('save-status').textContent = 'Unsaved colour change.';
-    });
+
+    // iOS Safari sometimes ignores the tap unless the input is focused first.
+    swatch.addEventListener('touchstart', () => { swatch.focus(); }, { passive: true });
+
+    const onPick = () => {
+      if (isValidHex(swatch.value)) {
+        draftColors[index] = swatch.value;
+        document.getElementById('save-status').textContent = 'Unsaved colour change.';
+      }
+    };
+    swatch.addEventListener('input', onPick);
+    swatch.addEventListener('change', onPick);
+
     row.appendChild(swatch);
   }
 

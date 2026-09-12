@@ -1,6 +1,6 @@
 // Bump this version whenever you re-upload index.html so phones pick up the new
 // version instead of serving the old cached one.
-const CACHE = 'chore-wheel-v3';
+const CACHE = 'chore-wheel-v4';
 
 const SHELL = [
   './',
