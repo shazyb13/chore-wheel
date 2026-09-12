@@ -652,16 +652,62 @@ function buildWheel(weekIndex) {
 function renderThisWeek(weekIndex) {
   const list = document.getElementById('assign-list');
   list.innerHTML = '';
+
   assignmentsForWeek(weekIndex).forEach(a => {
     const row = document.createElement('div');
     row.className = 'assign-row' + (a.off ? ' is-off' : '');
-    row.style.background = a.color.soft;
+    row.style.background = a.soft;
     row.innerHTML =
-      `<span class="swatch" style="background:${a.color.fill}"></span>` +
+      `<span class="swatch" style="background:${a.fill}"></span>` +
       `<span class="who">${esc(a.name)}</span>` +
       `<span class="what">${esc(a.chore)}</span>`;
+
+    // Nobody gets shunned for a week they were rostered off.
+    if (!a.off) {
+      const count = shunCount(weekIndex, a.name);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'shun' + (count > 0 ? ' shunned' : '');
+      btn.title = count > 0
+        ? `${a.name} has been shunned ${count} ${count === 1 ? 'time' : 'times'} this week`
+        : `Shun ${a.name} for not doing ${a.chore}`;
+      btn.innerHTML = count > 0
+        ? `<span>Shunned</span><span class="shun-count">${count}</span>`
+        : `<span>Shun</span>`;
+      btn.addEventListener('click', async () => {
+        const k = shunKey(weekIndex, a.name);
+        state.shuns[k] = (state.shuns[k] || 0) + 1;
+        pruneShuns(weekIndex);
+        renderThisWeek(weekIndex);
+        await persist();
+      });
+      row.appendChild(btn);
+    }
+
     list.appendChild(row);
   });
+
+  // A single line summarising who is in the doghouse, plus a way out.
+  const shunned = assignmentsForWeek(weekIndex)
+    .filter(a => !a.off && shunCount(weekIndex, a.name) > 0)
+    .sort((x, y) => shunCount(weekIndex, y.name) - shunCount(weekIndex, x.name));
+
+  if (shunned.length) {
+    const note = document.createElement('p');
+    note.className = 'shun-note';
+    const names = shunned.map(a => `${esc(a.name)} (${shunCount(weekIndex, a.name)})`).join(', ');
+    note.innerHTML = `In the doghouse: ${names}. ` +
+      `<a href="#" id="clear-shuns" style="color:inherit;">Forgive everyone</a> — ` +
+      `otherwise this clears itself when the week rolls over.`;
+    list.appendChild(note);
+
+    document.getElementById('clear-shuns').addEventListener('click', async (e) => {
+      e.preventDefault();
+      state.shuns = {};
+      renderThisWeek(weekIndex);
+      await persist();
+    });
+  }
 }
 
 function renderUpcoming(weekIndex, displayMonday) {
@@ -676,11 +722,65 @@ function renderUpcoming(weekIndex, displayMonday) {
     let html = `<h3>${fmtDate(wk)}</h3>`;
     assignmentsForWeek(weekIndex + k).forEach(a => {
       html += `<div class="week-line"><span class="who">${esc(a.name)}</span>` +
-              `<span class="pill" style="background:${a.color.soft};color:${a.color.fill}">${esc(a.chore)}</span></div>`;
+              `<span class="pill" style="background:${a.soft};color:${a.ink}">${esc(a.chore)}</span></div>`;
     });
     card.innerHTML = html;
     grid.appendChild(card);
   }
+}
+
+/* ---------------- end-of-week reminder ----------------
+   Shows in the last two days of the real week. Dismissal is per-week and
+   kept on the device only, so dismissing it doesn't hide it from the house. */
+const DISMISS_KEY = 'chore-wheel:reminder-dismissed';
+
+function daysLeftInWeek() {
+  const now = new Date();
+  const nextMonday = startOfThisWeek();
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  return Math.ceil((nextMonday - now) / (1000 * 60 * 60 * 24));
+}
+
+function renderReminder(weekIndex) {
+  const slot = document.getElementById('reminder-slot');
+  slot.innerHTML = '';
+
+  // Only for the live week, never while browsing ahead or back.
+  if (state.weekOffset !== 0) return;
+
+  const left = daysLeftInWeek();
+  if (left > 2 || left < 0) return;
+
+  let dismissed = null;
+  try { dismissed = localStorage.getItem(DISMISS_KEY); } catch (e) {}
+  if (dismissed === String(weekIndex)) return;
+
+  const onDuty = assignmentsForWeek(weekIndex).filter(a => !a.off);
+  if (!onDuty.length) return;
+
+  const when = left <= 1 ? 'today' : 'tomorrow';
+  const headline = left <= 1
+    ? 'Last day of the chore week'
+    : 'The chore week is nearly up';
+
+  const banner = document.createElement('div');
+  banner.className = 'reminder';
+  banner.innerHTML =
+    `<span class="bell">🔔</span>` +
+    `<span class="body">` +
+      `<span class="head">${headline}</span>` +
+      `<span class="sub">Everything resets Monday, so it needs doing by end of ${when}: ` +
+      onDuty.map(a => `<b>${esc(a.name)}</b> — ${esc(a.chore)}`).join('; ') +
+      `.</span>` +
+    `</span>` +
+    `<button class="close" type="button" title="Dismiss for this week">×</button>`;
+
+  banner.querySelector('.close').addEventListener('click', () => {
+    try { localStorage.setItem(DISMISS_KEY, String(weekIndex)); } catch (e) {}
+    slot.innerHTML = '';
+  });
+
+  slot.appendChild(banner);
 }
 
 /* ---------------- editor ---------------- */
@@ -688,16 +788,26 @@ function renderUpcoming(weekIndex, displayMonday) {
 // stale inputs behind, and typing is captured straight into the array.
 let draftNames = [];
 let draftChores = [];
+let draftColors = [];
 
 function makeRow(value, index, arr, kind) {
   const row = document.createElement('div');
   row.className = 'row-edit';
 
+  // Chores carry a colour picker; it drives the wheel, pills and row tints.
   if (kind === 'chore') {
-    const handle = document.createElement('span');
-    handle.className = 'handle';
-    handle.style.background = COLORS[index % COLORS.length].fill;
-    row.appendChild(handle);
+    const swatch = document.createElement('input');
+    swatch.type = 'color';
+    swatch.value = isValidHex(draftColors[index])
+      ? draftColors[index]
+      : COLORS[index % COLORS.length].fill;
+    swatch.title = 'Pick a colour for this chore';
+    swatch.setAttribute('aria-label', 'Colour for this chore');
+    swatch.addEventListener('input', () => {
+      draftColors[index] = swatch.value;
+      document.getElementById('save-status').textContent = 'Unsaved colour change.';
+    });
+    row.appendChild(swatch);
   }
 
   const input = document.createElement('input');
@@ -716,6 +826,8 @@ function makeRow(value, index, arr, kind) {
   del.disabled = arr.length <= 1;
   del.addEventListener('click', () => {
     arr.splice(index, 1);
+    // Colours are positional, so remove the matching one or they shift.
+    if (kind === 'chore') draftColors.splice(index, 1);
     renderEditor();
     document.getElementById('save-status').textContent = 'Unsaved changes.';
   });
@@ -742,6 +854,7 @@ function renderEditor() {
 function syncEditorFromState() {
   draftNames = state.names.slice();
   draftChores = state.chores.slice();
+  draftColors = state.chores.map((_, i) => colorFor(i));
   renderEditor();
 }
 
@@ -755,6 +868,7 @@ function render() {
   document.getElementById('hub-week').textContent = weekIndex;
 
   buildWheel(weekIndex);
+  renderReminder(weekIndex);
   renderThisWeek(weekIndex);
   renderUpcoming(weekIndex, displayMonday);
 
@@ -767,6 +881,7 @@ function render() {
 document.getElementById('next-week-btn').addEventListener('click', async () => {
   const wheel = document.getElementById('wheel');
   state.weekOffset += 1;
+  pruneShuns(currentWeekIndex());
   wheel.style.transform = `rotate(${-(360 / Math.max(state.names.length, 1))}deg)`;
   setTimeout(() => { wheel.style.transform = 'rotate(0deg)'; render(); }, 60);
   await persist();
@@ -774,6 +889,7 @@ document.getElementById('next-week-btn').addEventListener('click', async () => {
 
 document.getElementById('prev-week-btn').addEventListener('click', async () => {
   state.weekOffset -= 1;
+  pruneShuns(currentWeekIndex());
   render();
   await persist();
 });
@@ -789,6 +905,7 @@ document.getElementById('add-name-btn').addEventListener('click', () => {
 document.getElementById('add-chore-btn').addEventListener('click', () => {
   if (draftChores.length >= MAX_ITEMS) return;
   draftChores.push('');
+  draftColors.push(COLORS[(draftChores.length - 1) % COLORS.length].fill);
   renderEditor();
   const inputs = document.querySelectorAll('#chores-editor input');
   if (inputs.length) inputs[inputs.length - 1].focus();
@@ -796,16 +913,24 @@ document.getElementById('add-chore-btn').addEventListener('click', () => {
 
 document.getElementById('save-btn').addEventListener('click', async () => {
   const statusEl = document.getElementById('save-status');
-  const names  = draftNames.map(n => n.trim()).filter(Boolean);
-  const chores = draftChores.map(c => c.trim()).filter(Boolean);
+  const names = draftNames.map(n => n.trim()).filter(Boolean);
+
+  // Filter chores and colours together so a blank row doesn't misalign them.
+  const kept = draftChores
+    .map((c, i) => ({ chore: c.trim(), color: draftColors[i] }))
+    .filter(x => x.chore);
+  const chores = kept.map(x => x.chore);
+  const colors = kept.map((x, i) => isValidHex(x.color) ? x.color : COLORS[i % COLORS.length].fill);
 
   if (!names.length)  { statusEl.textContent = 'Add at least one roommate.'; return; }
   if (!chores.length) { statusEl.textContent = 'Add at least one chore.'; return; }
 
   state.names = names;
   state.chores = chores;
+  state.colors = colors;
   draftNames = names.slice();
   draftChores = chores.slice();
+  draftColors = colors.slice();
   renderEditor();
 
   statusEl.textContent = 'Saving…';
