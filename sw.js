@@ -1,6 +1,6 @@
 // Bump this version whenever you re-upload index.html so phones pick up the new
 // version instead of serving the old cached one.
-const CACHE = 'chore-wheel-v7';
+const CACHE = 'chore-wheel-v8';
 
 const SHELL = [
   './',
@@ -36,6 +36,10 @@ self.addEventListener('fetch', event => {
   // house state stays current. Let them fail naturally when offline; the app
   // already falls back to its local copy.
   if (url.hostname.includes('jsonbin.io')) return;
+
+  // Calendar files are downloads handed to the OS, not app shell. Let the
+  // browser fetch them normally so the calendar app receives them properly.
+  if (url.pathname.endsWith('.ics')) return;
 
   if (event.request.method !== 'GET') return;
 

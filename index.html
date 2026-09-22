@@ -225,6 +225,15 @@
     color: var(--ink-soft); border: 1px solid var(--line);
     border-radius: 999px; padding: 2px 8px;
   }
+  .cal-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'Space Grotesk', sans-serif; font-size: 11.5px; font-weight: 600;
+    color: var(--ink-soft); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  }
+  .cal-link:hover { border-color: var(--ink-soft); color: var(--ink); }
+  .cal-row { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
   .add-person-row { display: none; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
   .add-person-row.open { display: flex; }
   .add-person-row input {
@@ -388,6 +397,7 @@
     <div class="laundry-grid" id="laundry-grid"></div>
     <div class="laundry-hint" id="laundry-hint"></div>
     <div id="laundry-roster"></div>
+    <div class="cal-row" id="cal-row"></div>
     <div class="add-person-row" id="add-person-row">
       <input id="new-person-input" type="text" placeholder="Name" maxlength="24" autocomplete="off">
       <button class="btn-ghost btn-add" id="add-person-btn">Add</button>
@@ -1089,6 +1099,34 @@ function renderLaundry() {
 
     rosterBox.appendChild(row);
   });
+
+  // Calendar reminders. The web can't schedule a notification for later without
+  // a server, so this hands the job to the phone's own calendar instead.
+  const calRow = document.getElementById('cal-row');
+  calRow.innerHTML = '';
+
+  const myDay = known ? state.laundry[me] : null;
+  if (myDay) {
+    const full = (DAYS.find(d => d.key === myDay) || {}).full;
+    const a = document.createElement('a');
+    a.className = 'cal-link';
+    a.href = 'calendar/laundry-' + myDay + '.ics';
+    a.setAttribute('download', 'laundry-' + myDay + '.ics');
+    a.textContent = '📅 Remind me every ' + full;
+    calRow.appendChild(a);
+  }
+
+  const wk = document.createElement('a');
+  wk.className = 'cal-link';
+  wk.href = 'calendar/chore-week.ics';
+  wk.setAttribute('download', 'chore-week.ics');
+  wk.textContent = '📅 Chore week reminders';
+  calRow.appendChild(wk);
+
+  const hint = document.createElement('span');
+  hint.style.cssText = 'font-size:11.5px;color:var(--ink-soft);';
+  hint.textContent = 'Opens in your calendar app — set once per phone.';
+  calRow.appendChild(hint);
 }
 
 /* ---------------- editor ---------------- */
