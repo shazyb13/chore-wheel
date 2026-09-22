@@ -333,6 +333,14 @@
       <button class="btn-primary" id="save-btn">Save changes</button>
       <div class="status" id="save-status"></div>
     </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:22px 0 16px;">
+    <label style="display:block;font-size:12px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Restart the rotation</label>
+    <p class="note" style="margin-top:0;">
+      Makes the current week <b>Week 1</b>, so the first person takes the first chore
+      and everyone rotates on from there. Clears any shuns. Applies to the whole house.
+    </p>
+    <button class="btn-ghost" id="reset-week-btn">Restart from this week</button>
+    <div class="status" id="reset-status"></div>
   </details>
 
 </div>
@@ -905,7 +913,8 @@ function render() {
   displayMonday.setDate(displayMonday.getDate() + 7 * state.weekOffset);
 
   document.getElementById('week-label').textContent = fmtDate(displayMonday);
-  document.getElementById('hub-week').textContent = weekIndex;
+  // Displayed 1-based: the anchor week reads as "Week 1", not "Week 0".
+  document.getElementById('hub-week').textContent = weekIndex + 1;
 
   buildWheel(weekIndex);
   renderReminder(weekIndex);
@@ -981,6 +990,28 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     ? ` ${names.length - chores.length} ${names.length - chores.length === 1 ? 'person gets' : 'people get'} a week off each week, rotating.`
     : '';
   statusEl.textContent = 'Saved for the whole house.' + extra;
+});
+
+document.getElementById('reset-week-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('reset-status');
+  const ok = confirm(
+    'Restart the rotation so this week becomes Week 1?\n\n' +
+    'This changes the schedule for everyone in the house and clears this week\'s shuns.'
+  );
+  if (!ok) return;
+
+  // Anchor on this Monday with no offset, so currentWeekIndex() lands on 0
+  // and the first roommate takes the first chore.
+  state.anchorWeekStart = startOfThisWeek().toISOString();
+  state.weekOffset = 0;
+  state.shuns = {};
+
+  try { localStorage.removeItem(DISMISS_KEY); } catch (e) {}
+
+  statusEl.textContent = 'Restarting…';
+  render();
+  await persist();
+  statusEl.textContent = 'Done — this is now Week 1 for the whole house.';
 });
 
 document.getElementById('sync-now-btn').addEventListener('click', () => pullAndMerge(true));
